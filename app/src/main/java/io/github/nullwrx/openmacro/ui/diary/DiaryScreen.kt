@@ -154,6 +154,7 @@ fun DiaryScreen(
                     totals = state.totals,
                     targets = state.targets,
                     energyUnit = state.energyUnit,
+                    goalLabel = state.goalLabel,
                     onScan = { onScan(state.date, vm.mealForNow()) },
                 )
             }
@@ -221,7 +222,7 @@ fun DiaryScreen(
 }
 
 @Composable
-private fun SummaryCard(totals: Nutrients, targets: MacroTargets, energyUnit: EnergyUnit, onScan: () -> Unit) {
+private fun SummaryCard(totals: Nutrients, targets: MacroTargets, energyUnit: EnergyUnit, goalLabel: String, onScan: () -> Unit) {
     val macro = LocalMacroColors.current
     val eaten = Format.energyValue(totals.energyKcal, energyUnit)
     val goal = Format.energyValue(targets.energyKcal.toDouble(), energyUnit)
@@ -262,6 +263,9 @@ private fun SummaryCard(totals: Nutrients, targets: MacroTargets, energyUnit: En
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
+                    if (goalLabel.isNotEmpty()) {
+                        Text(goalLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    }
                     Text(
                         "Eaten $eaten · Goal $goal ${Format.energyUnit(energyUnit)}",
                         style = MaterialTheme.typography.bodySmall.merge(NumberStyle),

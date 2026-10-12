@@ -25,9 +25,7 @@ import io.github.nullwrx.openmacro.ui.NumberField
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-enum class Goal(val label: String) { LOSE("Lose"), MAINTAIN("Maintain"), GAIN("Gain") }
-
-/** Profile fields as typed, in the person's chosen units. */
+/** Body and activity fields as typed, in the person's chosen units. The goal lives in GoalForm. */
 data class ProfileForm(
     val unit: WeightUnit = WeightUnit.KG,
     val sex: Sex = Sex.FEMALE,
@@ -37,8 +35,6 @@ data class ProfileForm(
     val heightIn: String = "",
     val weight: String = "",
     val activity: ActivityLevel = ActivityLevel.LIGHT,
-    val goal: Goal = Goal.MAINTAIN,
-    val rate: String = "0.5",
 ) {
     val heightCmValue: Double?
         get() = if (unit == WeightUnit.KG) {
@@ -50,24 +46,14 @@ data class ProfileForm(
 
     val weightKgValue: Double? get() = Format.parse(weight)?.let { Format.toKg(it, unit) }
 
-    val rateKgValue: Double? get() = Format.parse(rate)?.let { Format.toKg(it, unit) }
-
+    /** The profile for planning, or null while something is missing or out of range. */
     fun toProfile(): Profile? {
         val year = birthYear.toIntOrNull() ?: return null
         val age = LocalDate.now().year - year
         if (age !in 13..110) return null
         val h = heightCmValue?.takeIf { it in 100.0..250.0 } ?: return null
         val w = weightKgValue?.takeIf { it in 30.0..350.0 } ?: return null
-        val rate = when (goal) {
-            Goal.MAINTAIN -> 0.0
-            else -> rateKgValue?.takeIf { it in 0.0..1.5 } ?: return null
-        }
-        val change = when (goal) {
-            Goal.LOSE -> -rate
-            Goal.MAINTAIN -> 0.0
-            Goal.GAIN -> rate
-        }
-        return Profile(sex, age, h, w, activity, change)
+        return Profile(sex, age, h, w, activity, weeklyChangeKg = 0.0)
     }
 
     fun applyTo(s: UserSettings): UserSettings {
@@ -79,7 +65,21 @@ data class ProfileForm(
             heightCm = p.heightCm,
             weightKg = p.weightKg,
             activity = p.activity,
-            weeklyChangeKg = p.weeklyChangeKg,
+        )
+    }
+
+    /** Switches units, converting what was already typed. */
+    fun convertedTo(target: WeightUnit): ProfileForm {
+        if (target == unit) return this
+        val cm = heightCmValue
+        val kg = weightKgValue
+        val totalIn = cm?.let { Units.cmToIn(it) }
+        return copy(
+            unit = target,
+            heightCm = cm?.roundToInt()?.toString() ?: heightCm,
+            heightFt = totalIn?.let { (it / 12).toInt().toString() } ?: heightFt,
+            heightIn = totalIn?.let { (it - (it / 12).toInt() * 12).roundToInt().toString() } ?: heightIn,
+            weight = kg?.let { Format.amount(Format.weightValue(it, target)) } ?: weight,
         )
     }
 
@@ -87,24 +87,15 @@ data class ProfileForm(
         fun from(s: UserSettings): ProfileForm {
             val totalIn = Units.cmToIn(s.heightCm)
             val ft = (totalIn / 12).toInt()
-            val inches = (totalIn - ft * 12).roundToInt()
-            val goal = when {
-                s.weeklyChangeKg < 0 -> Goal.LOSE
-                s.weeklyChangeKg > 0 -> Goal.GAIN
-                else -> Goal.MAINTAIN
-            }
-            val rateKg = kotlin.math.abs(s.weeklyChangeKg).takeIf { it > 0 } ?: 0.5
             return ProfileForm(
                 unit = s.weightUnit,
                 sex = s.sex,
                 birthYear = s.birthYear.toString(),
                 heightCm = s.heightCm.roundToInt().toString(),
                 heightFt = ft.toString(),
-                heightIn = inches.toString(),
+                heightIn = (totalIn - ft * 12).roundToInt().toString(),
                 weight = Format.amount(Format.weightValue(s.weightKg, s.weightUnit)),
                 activity = s.activity,
-                goal = goal,
-                rate = Format.amount(Format.weightValue(rateKg, s.weightUnit)),
             )
         }
     }
@@ -113,7 +104,6 @@ data class ProfileForm(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileFields(form: ProfileForm, edit: ((ProfileForm) -> ProfileForm) -> Unit) {
-    val unitLabel = Format.weightUnit(form.unit)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             SegmentedButton(
@@ -149,7 +139,13 @@ fun ProfileFields(form: ProfileForm, edit: ((ProfileForm) -> ProfileForm) -> Uni
                 NumberField(form.heightIn, { v -> edit { it.copy(heightIn = v) } }, "", Modifier.weight(1f), suffix = "in")
             }
         }
-        NumberField(form.weight, { v -> edit { it.copy(weight = v) } }, "Current weight", Modifier.fillMaxWidth(), suffix = unitLabel)
+        NumberField(
+            form.weight,
+            { v -> edit { it.copy(weight = v) } },
+            "Current weight",
+            Modifier.fillMaxWidth(),
+            suffix = Format.weightUnit(form.unit),
+        )
         ChoiceField(
             label = "Activity",
             selected = form.activity,
@@ -158,46 +154,5 @@ fun ProfileFields(form: ProfileForm, edit: ((ProfileForm) -> ProfileForm) -> Uni
             onSelect = { a -> edit { it.copy(activity = a) } },
             modifier = Modifier.fillMaxWidth(),
         )
-        Text("Goal", style = MaterialTheme.typography.bodyMedium)
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            Goal.entries.forEachIndexed { i, g ->
-                SegmentedButton(
-                    selected = form.goal == g,
-                    onClick = { edit { it.copy(goal = g) } },
-                    shape = SegmentedButtonDefaults.itemShape(i, Goal.entries.size),
-                ) { Text(g.label) }
-            }
-        }
-        if (form.goal != Goal.MAINTAIN) {
-            NumberField(
-                form.rate,
-                { v -> edit { it.copy(rate = v) } },
-                "Rate",
-                Modifier.fillMaxWidth(),
-                suffix = "$unitLabel per week",
-                supportingText = if (form.unit == WeightUnit.KG) {
-                    "0.25 to 0.75 kg a week is sustainable for most people"
-                } else {
-                    "0.5 to 1.5 lb a week is sustainable for most people"
-                },
-            )
-        }
     }
-}
-
-/** Switches units, converting what was already typed. */
-private fun ProfileForm.convertedTo(target: WeightUnit): ProfileForm {
-    if (target == unit) return this
-    val cm = heightCmValue
-    val kg = weightKgValue
-    val rateKg = rateKgValue
-    val totalIn = cm?.let { Units.cmToIn(it) }
-    return copy(
-        unit = target,
-        heightCm = cm?.roundToInt()?.toString() ?: heightCm,
-        heightFt = totalIn?.let { (it / 12).toInt().toString() } ?: heightFt,
-        heightIn = totalIn?.let { (it - (it / 12).toInt() * 12).roundToInt().toString() } ?: heightIn,
-        weight = kg?.let { Format.amount(Format.weightValue(it, target)) } ?: weight,
-        rate = rateKg?.let { Format.amount(Format.weightValue(it, target)) } ?: rate,
-    )
 }

@@ -54,6 +54,8 @@ import io.github.nullwrx.openmacro.ui.AppBottomBar
 import io.github.nullwrx.openmacro.ui.ConfirmDialog
 import io.github.nullwrx.openmacro.ui.TopLevel
 import io.github.nullwrx.openmacro.ui.appViewModel
+import io.github.nullwrx.openmacro.ui.goals.GoalForm
+import io.github.nullwrx.openmacro.ui.goals.goalSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
@@ -142,9 +144,12 @@ fun SettingsScreen(
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             Header("Goals and food")
             ListItem(
-                headlineContent = { Text("Goals and profile") },
+                headlineContent = { Text("Goal and targets") },
                 supportingContent = {
-                    Text("${s.targets.energyKcal} kcal · P ${s.targets.proteinG} g · C ${s.targets.carbsG} g · F ${s.targets.fatG} g")
+                    Text(
+                        goalSummary(GoalForm.from(s.goal, s.weightUnit)) + "\n" +
+                            "${s.targets.energyKcal} kcal · P ${s.targets.proteinG} g · C ${s.targets.carbsG} g · F ${s.targets.fatG} g",
+                    )
                 },
                 modifier = Modifier.clickable(onClick = onOpenGoals),
             )

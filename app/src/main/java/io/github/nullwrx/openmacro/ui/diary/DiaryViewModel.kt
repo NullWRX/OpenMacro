@@ -9,6 +9,8 @@ import io.github.nullwrx.openmacro.core.MealDefaults
 import io.github.nullwrx.openmacro.core.Nutrients
 import io.github.nullwrx.openmacro.data.db.DiaryEntryEntity
 import io.github.nullwrx.openmacro.data.settings.EnergyUnit
+import io.github.nullwrx.openmacro.ui.goals.GoalForm
+import io.github.nullwrx.openmacro.ui.goals.goalSummary
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,6 +37,8 @@ data class DiaryState(
     val targets: MacroTargets = MacroTargets(2000, 100, 250, 67, 28, 2300),
     val energyUnit: EnergyUnit = EnergyUnit.KCAL,
     val mealNames: List<String> = MealDefaults.DEFAULT_MEALS,
+    /** "Lose fat · 0.4 kg/week", shown under the summary. */
+    val goalLabel: String = "",
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -64,6 +68,7 @@ class DiaryViewModel(private val c: AppContainer, private val handle: SavedState
             targets = settings.targets,
             energyUnit = settings.energyUnit,
             mealNames = settings.meals,
+            goalLabel = goalSummary(GoalForm.from(settings.goal, settings.weightUnit)),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryState(date.value))
 

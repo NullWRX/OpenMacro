@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,28 +26,34 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import io.github.nullwrx.openmacro.AppContainer
-import io.github.nullwrx.openmacro.core.EnergyMath
-import io.github.nullwrx.openmacro.core.MacroPlanner
-import io.github.nullwrx.openmacro.core.MacroTargets
-import io.github.nullwrx.openmacro.ui.Format
-import io.github.nullwrx.openmacro.ui.NumberField
-import io.github.nullwrx.openmacro.ui.NutrientRow
+import io.github.nullwrx.openmacro.core.GoalPlan
+import io.github.nullwrx.openmacro.core.GoalPlanner
+import io.github.nullwrx.openmacro.core.GoalPreset
+import io.github.nullwrx.openmacro.data.settings.WeightUnit
 import io.github.nullwrx.openmacro.ui.appViewModel
+import io.github.nullwrx.openmacro.ui.goals.GoalDetails
+import io.github.nullwrx.openmacro.ui.goals.GoalForm
+import io.github.nullwrx.openmacro.ui.goals.GoalPresetPicker
+import io.github.nullwrx.openmacro.ui.goals.TargetsPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import kotlin.math.roundToInt
 
 data class OnboardingState(
     val step: Int = 0,
     val profile: ProfileForm = ProfileForm(),
-    val tdee: Int = 0,
-    val targets: MacroTargets? = null,
-    val kcalText: String = "",
-)
+    val goal: GoalForm = GoalForm(),
+) {
+    val plan: GoalPlan?
+        get() {
+            val p = profile.toProfile() ?: return null
+            val g = goal.toGoal() ?: return null
+            return GoalPlanner.plan(p, g)
+        }
+}
 
 class OnboardingViewModel(private val c: AppContainer, @Suppress("UNUSED_PARAMETER") handle: SavedStateHandle) : ViewModel() {
     private val _state = MutableStateFlow(OnboardingState())
@@ -59,47 +63,44 @@ class OnboardingViewModel(private val c: AppContainer, @Suppress("UNUSED_PARAMET
         // Default to imperial units where people usually use them.
         val country = java.util.Locale.getDefault().country
         if (country in setOf("US", "LR", "MM")) {
-            _state.update { it.copy(profile = it.profile.copy(unit = io.github.nullwrx.openmacro.data.settings.WeightUnit.LB, rate = "1")) }
+            _state.update {
+                it.copy(profile = it.profile.copy(unit = WeightUnit.LB), goal = it.goal.copy(unit = WeightUnit.LB))
+            }
         }
     }
 
-    fun next() = _state.update { it.copy(step = it.step + 1) }
     fun back() = _state.update { it.copy(step = (it.step - 1).coerceAtLeast(0)) }
 
-    fun editProfile(transform: (ProfileForm) -> ProfileForm) = _state.update { it.copy(profile = transform(it.profile)) }
-
-    fun computeTargets() {
-        val profile = _state.value.profile.toProfile() ?: return
-        val targets = MacroPlanner.forProfile(profile)
-        _state.update {
-            it.copy(
-                step = 2,
-                tdee = EnergyMath.tdee(profile).roundToInt(),
-                targets = targets,
-                kcalText = targets.energyKcal.toString(),
-            )
-        }
+    fun next() = _state.update { s ->
+        // Entering the goal step: fill the chosen goal's suggested rate for this body.
+        val goal = if (s.step == 1) s.goal.withPreset(s.goal.preset, s.profile.weightKgValue) else s.goal
+        s.copy(step = s.step + 1, goal = goal)
     }
 
-    /** Changing calories re-splits the macros the same way. */
-    fun setCalories(text: String) {
-        val profile = _state.value.profile.toProfile()
-        val kcal = Format.parse(text)?.roundToInt()
-        _state.update { s ->
-            val targets = if (profile != null && kcal != null && kcal in 800..8000) {
-                MacroPlanner.fromCalories(kcal, profile.weightKg)
-            } else {
-                s.targets
-            }
-            s.copy(kcalText = text, targets = targets)
-        }
+    fun editProfile(transform: (ProfileForm) -> ProfileForm) = _state.update { s ->
+        val profile = transform(s.profile)
+        s.copy(profile = profile, goal = s.goal.convertedTo(profile.unit))
+    }
+
+    fun editGoal(transform: (GoalForm) -> GoalForm) = _state.update { it.copy(goal = transform(it.goal)) }
+
+    fun selectPreset(preset: GoalPreset) = _state.update { s ->
+        s.copy(goal = s.goal.withPreset(preset, s.profile.weightKgValue))
     }
 
     fun finish(onDone: () -> Unit) {
         val s = _state.value
-        val targets = s.targets ?: return
+        val plan = s.plan ?: return
+        val goal = s.goal.toGoal() ?: return
         viewModelScope.launch {
-            c.settings.update { current -> s.profile.applyTo(current).copy(targets = targets, onboarded = true) }
+            c.settings.update { current ->
+                s.profile.applyTo(current).copy(
+                    goal = goal.copy(weeklyChangeKg = plan.weeklyChangeKg),
+                    autoAdjustTargets = true,
+                    targets = plan.targets,
+                    onboarded = true,
+                )
+            }
             s.profile.weightKgValue?.let { c.weights.log(LocalDate.now().toEpochDay(), it) }
             onDone()
         }
@@ -134,37 +135,26 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                 1 -> {
                     Text("About you", style = MaterialTheme.typography.headlineMedium)
                     Text(
-                        "This sets your starting calorie and macro targets. It stays on your phone.",
+                        "Used to estimate how many calories you burn. It stays on your phone.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     ProfileFields(state.profile, vm::editProfile)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         TextButton(onClick = vm::back) { Text("Back") }
-                        Button(onClick = vm::computeTargets, enabled = state.profile.toProfile() != null) { Text("Continue") }
+                        Button(onClick = vm::next, enabled = state.profile.toProfile() != null) { Text("Continue") }
                     }
                 }
                 else -> {
-                    val t = state.targets
-                    Text("Your daily targets", style = MaterialTheme.typography.headlineMedium)
+                    Text("Your goal", style = MaterialTheme.typography.headlineMedium)
                     Text(
-                        "You burn about ${state.tdee} kcal a day by our estimate. The targets below follow your goal; " +
-                            "you can change any of them later.",
+                        "Pick what you're working toward. You can switch goals any time in Settings.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    NumberField(state.kcalText, vm::setCalories, "Calories", Modifier.fillMaxWidth(), suffix = "kcal")
-                    if (t != null) {
-                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                            Column(Modifier.padding(16.dp)) {
-                                NutrientRow("Protein", "${t.proteinG} g")
-                                NutrientRow("Carbs", "${t.carbsG} g")
-                                NutrientRow("Fat", "${t.fatG} g")
-                                NutrientRow("Fiber", "${t.fiberG} g")
-                                NutrientRow("Sodium limit", "${t.sodiumMg} mg")
-                            }
-                        }
-                    }
+                    GoalPresetPicker(state.goal.preset, vm::selectPreset)
+                    GoalDetails(state.goal, state.profile.weightKgValue, vm::editGoal)
+                    TargetsPreview(state.plan, io.github.nullwrx.openmacro.data.settings.EnergyUnit.KCAL)
                     Text(
                         "Estimates only, not medical advice. If you are pregnant, under 18, or managing a health " +
                             "condition, check targets with a professional.",
@@ -173,7 +163,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         TextButton(onClick = vm::back) { Text("Back") }
-                        Button(onClick = { vm.finish(onFinished) }, enabled = t != null) { Text("Start tracking") }
+                        Button(onClick = { vm.finish(onFinished) }, enabled = state.plan != null) { Text("Start tracking") }
                     }
                 }
             }
@@ -188,12 +178,13 @@ private fun Welcome(onStart: () -> Unit, onSkip: () -> Unit) {
     Text("Track calories and macros. Free, forever.", style = MaterialTheme.typography.titleLarge)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(
+            "Goals for cutting, recomping, lean bulking or bulking, or set your own",
             "Barcode and nutrition-label scanning, no subscription",
             "Your data stays on your phone; export it any time",
             "No ads, no account, open source",
         ).forEach { Text("• $it", style = MaterialTheme.typography.bodyLarge) }
     }
     Spacer(Modifier.height(16.dp))
-    Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("Set up my targets") }
+    Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("Set up my goal") }
     TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Skip for now") }
 }

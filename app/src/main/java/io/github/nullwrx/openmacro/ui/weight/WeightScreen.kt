@@ -81,12 +81,29 @@ class WeightViewModel(private val c: AppContainer, @Suppress("UNUSED_PARAMETER")
     fun log(day: Long, value: Double, unit: WeightUnit) = viewModelScope.launch {
         val kg = Format.toKg(value, unit)
         c.weights.log(day, kg)
-        // Keep the planning weight current when the newest weigh-in changes.
-        val latest = c.weights.latest()
-        if (latest != null && latest.date == day) c.settings.update { it.copy(weightKg = kg) }
+        syncPlanningWeight()
     }
 
-    fun delete(day: Long) = viewModelScope.launch { c.weights.delete(day) }
+    fun delete(day: Long) = viewModelScope.launch {
+        c.weights.delete(day)
+        syncPlanningWeight()
+    }
+
+    /**
+     * Keeps the planning weight equal to the newest weigh-in and, when the goal follows weight,
+     * recalculates targets so a cut or bulk keeps fitting the body as it changes.
+     */
+    private suspend fun syncPlanningWeight() {
+        val latest = c.weights.latest() ?: return
+        c.settings.update { s ->
+            if (kotlin.math.abs(s.weightKg - latest.kg) < 0.01) {
+                s
+            } else {
+                val moved = s.copy(weightKg = latest.kg)
+                if (s.autoAdjustTargets) moved.withPlannedTargets() else moved
+            }
+        }
+    }
 }
 
 private enum class Range(val label: String, val days: Long?) {

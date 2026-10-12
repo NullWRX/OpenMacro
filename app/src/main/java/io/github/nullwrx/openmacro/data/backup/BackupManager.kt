@@ -3,7 +3,11 @@ package io.github.nullwrx.openmacro.data.backup
 import androidx.room.withTransaction
 import io.github.nullwrx.openmacro.core.ActivityLevel
 import io.github.nullwrx.openmacro.core.BaseUnit
+import io.github.nullwrx.openmacro.core.CalorieMode
 import io.github.nullwrx.openmacro.core.Csv
+import io.github.nullwrx.openmacro.core.GoalPreset
+import io.github.nullwrx.openmacro.core.GoalSettings
+import io.github.nullwrx.openmacro.core.MacroMode
 import io.github.nullwrx.openmacro.core.MacroTargets
 import io.github.nullwrx.openmacro.core.Sex
 import io.github.nullwrx.openmacro.data.db.AppDatabase
@@ -98,6 +102,28 @@ data class SettingsDto(
     val theme: String,
     val dynamicColor: Boolean,
     val meals: List<String>,
+    /** Added in v0.2.0; absent in older backups. */
+    val goal: GoalDto? = null,
+    val autoAdjustTargets: Boolean? = null,
+)
+
+@Serializable
+data class GoalDto(
+    val preset: String,
+    val weeklyChangeKg: Double,
+    val calorieMode: String,
+    val fixedKcal: Int,
+    val macroMode: String,
+    val proteinPct: Int,
+    val carbsPct: Int,
+    val fatPct: Int,
+    val proteinPerKg: Double,
+    val fatPerKg: Double,
+    val proteinG: Int,
+    val carbsG: Int,
+    val fatG: Int,
+    val fiberG: Int? = null,
+    val sodiumMg: Int,
 )
 
 @Serializable
@@ -282,9 +308,15 @@ class BackupManager(
     )
 
     private fun UserSettings.toDto() = SettingsDto(
-        sex.name, birthYear, heightCm, weightKg, activity.name, weeklyChangeKg,
+        sex.name, birthYear, heightCm, weightKg, activity.name, goal.weeklyChangeKg,
         targets.energyKcal, targets.proteinG, targets.carbsG, targets.fatG, targets.fiberG, targets.sodiumMg,
         weightUnit.name, energyUnit.name, theme.name, dynamicColor, meals,
+        goal = GoalDto(
+            goal.preset.name, goal.weeklyChangeKg, goal.calorieMode.name, goal.fixedKcal, goal.macroMode.name,
+            goal.proteinPct, goal.carbsPct, goal.fatPct, goal.proteinPerKg, goal.fatPerKg,
+            goal.proteinG, goal.carbsG, goal.fatG, goal.fiberG, goal.sodiumMg,
+        ),
+        autoAdjustTargets = autoAdjustTargets,
     )
 
     private fun SettingsDto.applyTo(s: UserSettings) = s.copy(
@@ -294,13 +326,45 @@ class BackupManager(
         heightCm = heightCm,
         weightKg = weightKg,
         activity = enumValueOrNull<ActivityLevel>(activity) ?: s.activity,
-        weeklyChangeKg = weeklyChangeKg,
+        goal = goal?.toGoal() ?: GoalSettings(
+            // Backups from before goals existed keep their exact targets as a custom goal.
+            preset = GoalPreset.CUSTOM,
+            weeklyChangeKg = weeklyChangeKg,
+            macroMode = MacroMode.GRAMS,
+            proteinG = targetProtein,
+            carbsG = targetCarbs,
+            fatG = targetFat,
+            fiberG = targetFiber,
+            sodiumMg = targetSodiumMg,
+        ),
+        autoAdjustTargets = autoAdjustTargets ?: (goal != null),
         targets = MacroTargets(targetKcal, targetProtein, targetCarbs, targetFat, targetFiber, targetSodiumMg),
         weightUnit = enumValueOrNull<WeightUnit>(weightUnit) ?: s.weightUnit,
         energyUnit = enumValueOrNull<EnergyUnit>(energyUnit) ?: s.energyUnit,
         theme = enumValueOrNull<ThemeMode>(theme) ?: s.theme,
         dynamicColor = dynamicColor,
         meals = meals.ifEmpty { s.meals },
+    )
+}
+
+private fun GoalDto.toGoal(): GoalSettings {
+    val d = GoalSettings()
+    return GoalSettings(
+        preset = enumValueOrNull<GoalPreset>(preset) ?: d.preset,
+        weeklyChangeKg = weeklyChangeKg,
+        calorieMode = enumValueOrNull<CalorieMode>(calorieMode) ?: d.calorieMode,
+        fixedKcal = fixedKcal,
+        macroMode = enumValueOrNull<MacroMode>(macroMode) ?: d.macroMode,
+        proteinPct = proteinPct,
+        carbsPct = carbsPct,
+        fatPct = fatPct,
+        proteinPerKg = proteinPerKg,
+        fatPerKg = fatPerKg,
+        proteinG = proteinG,
+        carbsG = carbsG,
+        fatG = fatG,
+        fiberG = fiberG,
+        sodiumMg = sodiumMg,
     )
 }
 

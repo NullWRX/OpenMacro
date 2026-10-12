@@ -2,10 +2,8 @@ package io.github.nullwrx.openmacro.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -14,12 +12,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -32,12 +31,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import io.github.nullwrx.openmacro.AppContainer
-import io.github.nullwrx.openmacro.core.EnergyMath
-import io.github.nullwrx.openmacro.core.MacroPlanner
-import io.github.nullwrx.openmacro.core.MacroTargets
-import io.github.nullwrx.openmacro.ui.Format
-import io.github.nullwrx.openmacro.ui.NumberField
+import io.github.nullwrx.openmacro.core.CalorieMode
+import io.github.nullwrx.openmacro.core.GoalPlan
+import io.github.nullwrx.openmacro.core.GoalPlanner
+import io.github.nullwrx.openmacro.core.GoalPreset
+import io.github.nullwrx.openmacro.core.MacroMode
+import io.github.nullwrx.openmacro.data.settings.EnergyUnit
 import io.github.nullwrx.openmacro.ui.appViewModel
+import io.github.nullwrx.openmacro.ui.goals.GoalDetails
+import io.github.nullwrx.openmacro.ui.goals.GoalForm
+import io.github.nullwrx.openmacro.ui.goals.GoalPresetPicker
+import io.github.nullwrx.openmacro.ui.goals.TargetsPreview
 import io.github.nullwrx.openmacro.ui.onboarding.ProfileFields
 import io.github.nullwrx.openmacro.ui.onboarding.ProfileForm
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,37 +49,27 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
-data class GoalsForm(
-    val kcal: String = "",
-    val protein: String = "",
-    val carbs: String = "",
-    val fat: String = "",
-    val fiber: String = "",
-    val sodium: String = "",
+data class GoalsState(
+    val loaded: Boolean = false,
+    val profile: ProfileForm = ProfileForm(),
+    val goal: GoalForm = GoalForm(),
+    val autoAdjust: Boolean = true,
+    val energyUnit: EnergyUnit = EnergyUnit.KCAL,
 ) {
-    fun toTargets(): MacroTargets? {
-        val k = Format.parse(kcal)?.roundToInt()?.takeIf { it in 500..10000 } ?: return null
-        return MacroTargets(
-            energyKcal = k,
-            proteinG = Format.parse(protein)?.roundToInt() ?: 0,
-            carbsG = Format.parse(carbs)?.roundToInt() ?: 0,
-            fatG = Format.parse(fat)?.roundToInt() ?: 0,
-            fiberG = Format.parse(fiber)?.roundToInt() ?: 0,
-            sodiumMg = Format.parse(sodium)?.roundToInt() ?: 0,
-        )
-    }
+    val plan: GoalPlan?
+        get() {
+            val p = profile.toProfile() ?: return null
+            val g = goal.toGoal() ?: return null
+            return GoalPlanner.plan(p, g)
+        }
 
-    companion object {
-        fun from(t: MacroTargets) = GoalsForm(
-            t.energyKcal.toString(), t.proteinG.toString(), t.carbsG.toString(), t.fatG.toString(),
-            t.fiberG.toString(), t.sodiumMg.toString(),
-        )
-    }
+    /** Whether targets depend on body weight, so following weigh-ins makes a difference. */
+    val followsWeight: Boolean
+        get() = goal.preset != GoalPreset.CUSTOM ||
+            goal.macroMode == MacroMode.PER_KG ||
+            (goal.macroMode == MacroMode.PERCENT && goal.calorieMode == CalorieMode.FROM_RATE)
 }
-
-data class GoalsState(val loaded: Boolean = false, val goals: GoalsForm = GoalsForm(), val profile: ProfileForm = ProfileForm())
 
 class GoalsViewModel(private val c: AppContainer, @Suppress("UNUSED_PARAMETER") handle: SavedStateHandle) : ViewModel() {
     private val _state = MutableStateFlow(GoalsState())
@@ -84,24 +78,41 @@ class GoalsViewModel(private val c: AppContainer, @Suppress("UNUSED_PARAMETER") 
     init {
         viewModelScope.launch {
             val s = c.settings.current()
-            _state.value = GoalsState(true, GoalsForm.from(s.targets), ProfileForm.from(s))
+            _state.value = GoalsState(
+                loaded = true,
+                profile = ProfileForm.from(s),
+                goal = GoalForm.from(s.goal, s.weightUnit),
+                autoAdjust = s.autoAdjustTargets,
+                energyUnit = s.energyUnit,
+            )
         }
     }
 
-    fun editGoals(transform: (GoalsForm) -> GoalsForm) = _state.update { it.copy(goals = transform(it.goals)) }
-    fun editProfile(transform: (ProfileForm) -> ProfileForm) = _state.update { it.copy(profile = transform(it.profile)) }
-
-    /** Recomputes all targets from the profile. */
-    fun recalculate() {
-        val profile = _state.value.profile.toProfile() ?: return
-        _state.update { it.copy(goals = GoalsForm.from(MacroPlanner.forProfile(profile))) }
+    fun editProfile(transform: (ProfileForm) -> ProfileForm) = _state.update { s ->
+        val profile = transform(s.profile)
+        s.copy(profile = profile, goal = s.goal.convertedTo(profile.unit))
     }
+
+    fun editGoal(transform: (GoalForm) -> GoalForm) = _state.update { it.copy(goal = transform(it.goal)) }
+
+    fun selectPreset(preset: GoalPreset) = _state.update { s ->
+        s.copy(goal = s.goal.withPreset(preset, s.profile.weightKgValue))
+    }
+
+    fun setAutoAdjust(on: Boolean) = _state.update { it.copy(autoAdjust = on) }
 
     fun save(onDone: () -> Unit) {
         val s = _state.value
-        val targets = s.goals.toTargets() ?: return
+        val plan = s.plan ?: return
+        val goal = s.goal.toGoal() ?: return
         viewModelScope.launch {
-            c.settings.update { current -> s.profile.applyTo(current).copy(targets = targets) }
+            c.settings.update { current ->
+                s.profile.applyTo(current).copy(
+                    goal = goal.copy(weeklyChangeKg = plan.weeklyChangeKg),
+                    autoAdjustTargets = s.autoAdjust,
+                    targets = plan.targets,
+                )
+            }
             onDone()
         }
     }
@@ -112,17 +123,16 @@ class GoalsViewModel(private val c: AppContainer, @Suppress("UNUSED_PARAMETER") 
 fun GoalsScreen(onBack: () -> Unit) {
     val vm = appViewModel { c, h -> GoalsViewModel(c, h) }
     val state by vm.state.collectAsStateWithLifecycle()
-    val g = state.goals
-    val targets = g.toTargets()
+    val plan = state.plan
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Goals and profile") },
+                title = { Text("Goal and targets") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
-                actions = { TextButton(onClick = { vm.save(onBack) }, enabled = targets != null) { Text("Save") } },
+                actions = { TextButton(onClick = { vm.save(onBack) }, enabled = plan != null) { Text("Save") } },
             )
         },
     ) { padding ->
@@ -131,39 +141,40 @@ fun GoalsScreen(onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Daily targets", style = MaterialTheme.typography.titleMedium)
-            NumberField(g.kcal, { v -> vm.editGoals { it.copy(kcal = v) } }, "Calories", Modifier.fillMaxWidth(), suffix = "kcal", isError = targets == null)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumberField(g.protein, { v -> vm.editGoals { it.copy(protein = v) } }, "Protein", Modifier.weight(1f), suffix = "g")
-                NumberField(g.carbs, { v -> vm.editGoals { it.copy(carbs = v) } }, "Carbs", Modifier.weight(1f), suffix = "g")
-                NumberField(g.fat, { v -> vm.editGoals { it.copy(fat = v) } }, "Fat", Modifier.weight(1f), suffix = "g")
-            }
-            if (targets != null) {
-                val fromMacros = EnergyMath.atwaterKcal(targets.proteinG.toDouble(), targets.carbsG.toDouble(), targets.fatG.toDouble()).roundToInt()
-                val diff = fromMacros - targets.energyKcal
-                Text(
-                    if (kotlin.math.abs(diff) <= 25) "Macros add up to $fromMacros kcal, matching your calorie target."
-                    else "Macros add up to $fromMacros kcal, ${kotlin.math.abs(diff)} ${if (diff > 0) "over" else "under"} your calorie target.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumberField(g.fiber, { v -> vm.editGoals { it.copy(fiber = v) } }, "Fiber", Modifier.weight(1f), suffix = "g")
-                NumberField(g.sodium, { v -> vm.editGoals { it.copy(sodium = v) } }, "Sodium limit", Modifier.weight(1f), suffix = "mg")
-            }
+            Text("What are you working toward?", style = MaterialTheme.typography.titleMedium)
+            GoalPresetPicker(state.goal.preset, vm::selectPreset)
+            GoalDetails(state.goal, state.profile.weightKgValue, vm::editGoal)
+            TargetsPreview(
+                plan = plan,
+                energyUnit = state.energyUnit,
+                missing = if (state.profile.toProfile() == null) {
+                    "Complete your profile below to see your targets."
+                } else {
+                    "Fill in the goal fields above to see your targets."
+                },
+            )
+            ListItem(
+                headlineContent = { Text("Update targets as my weight changes") },
+                supportingContent = {
+                    Text(
+                        if (state.followsWeight) {
+                            "Recalculated when you log a new weight, so a cut or bulk keeps fitting your body."
+                        } else {
+                            "This goal uses fixed numbers, so weigh-ins won't change it."
+                        },
+                    )
+                },
+                trailingContent = { Switch(checked = state.autoAdjust, onCheckedChange = vm::setAutoAdjust) },
+            )
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Text("Profile", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Used to estimate your energy needs. Change it and tap Recalculate to get new targets.",
+                "Used to estimate how many calories you burn.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             ProfileFields(state.profile, vm::editProfile)
-            FilledTonalButton(onClick = vm::recalculate, enabled = state.profile.toProfile() != null, modifier = Modifier.fillMaxWidth()) {
-                Text("Recalculate targets from profile")
-            }
             Spacer(Modifier.height(24.dp))
         }
     }
