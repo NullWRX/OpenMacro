@@ -88,6 +88,7 @@ jobs:
           awk -v v="${TAG#v}" '
             $0 ~ "^## \\[" v "\\]" { found=1; next }
             found && /^## \[/ { exit }
+            found && /^\[[^]]+\]: / { next }
             found { print }
           ' CHANGELOG.md > dist/notes.md
           cat >> dist/notes.md <<'NOTES'
