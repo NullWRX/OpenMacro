@@ -2,9 +2,9 @@
 
 A free, open-source calorie and macro tracker for Android. The features other trackers charge for, such as barcode scanning, label scanning and custom macro targets, are free here, with no ads, no account and no subscription.
 
-> **Status: v0.1.0, early preview.** The calorie and macro tracker is the focus. Workout tracking is planned for later.
+> **Status: v0.2.0, early preview.** The calorie and macro tracker is the focus. Workout tracking is planned for later.
 
-## Features in v0.1.0
+## Features
 
 **Logging**
 - Food diary by day, with your own meal names (Breakfast, Lunch, Dinner, Snacks by default)
@@ -17,9 +17,13 @@ A free, open-source calorie and macro tracker for Android. The features other tr
 - Copy a meal or a whole day; move or copy single items; undo delete
 - New items default to the meal that fits the time of day
 
-**Targets and progress**
-- Starting targets from your profile (Mifflin-St Jeor plus activity) and goal rate
-- Editable calorie, protein, carb, fat, fiber and sodium targets
+**Goals and targets**
+- Fitness goals that set your calories and macros: Lose fat, Recomp, Maintain, Build muscle (lean bulk) and Bulk
+- A custom goal: calories from a weekly change or an exact number, macros by percent, g per kg or lb, or grams
+- Energy needs from your profile (Mifflin-St Jeor plus activity), with a live preview and safety limits
+- Targets can recalculate as you log your weight
+
+**Progress**
 - Weight log with a smoothed trend line and weekly rate of change
 
 **Your data**

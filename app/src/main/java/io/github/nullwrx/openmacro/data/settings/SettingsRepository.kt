@@ -214,7 +214,8 @@ class SettingsRepository(context: Context) {
         p[Keys.proteinG] = g.proteinG
         p[Keys.carbsG] = g.carbsG
         p[Keys.fatG] = g.fatG
-        if (g.fiberG != null) p[Keys.goalFiber] = g.fiberG else p.remove(Keys.goalFiber)
+        val fiber = g.fiberG
+        if (fiber != null) p[Keys.goalFiber] = fiber else p.remove(Keys.goalFiber)
         p[Keys.goalSodium] = g.sodiumMg
         p[Keys.autoAdjust] = s.autoAdjustTargets
     }

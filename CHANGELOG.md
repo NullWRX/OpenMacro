@@ -4,6 +4,30 @@ All notable changes to OpenMacro. Versions follow `vMAJOR.MINOR.PATCH` (see CONT
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
+Fitness goals: pick what you're training for and the app sets your calories and macros.
+
+### Added
+- Goal presets with their own calorie and macro rules:
+  - **Lose fat**: about 0.5% of body weight a week, protein 2.0 g/kg
+  - **Recomp**: small deficit (0.25% a week), protein 2.2 g/kg
+  - **Maintain**: maintenance calories, protein 1.6 g/kg
+  - **Build muscle** (lean bulk): about 0.25% a week surplus, protein 1.8 g/kg
+  - **Bulk**: about 0.5% a week surplus, protein 1.6 g/kg
+  - Fat is a share of calories (25 to 30%) and never below 0.5 g/kg; carbs fill the rest
+- **Custom goal**: set calories from a weekly change (lose, maintain or gain) or as an exact number, and split macros by percent, by grams per kg or lb of body weight, or in exact grams
+- Adjustable weekly rate for each preset, with a suggested value for your weight and a cap of 1% of body weight a week
+- Live preview of the targets while you edit, showing maintenance calories, deficit or surplus, each macro's share of energy, and warnings (calorie minimum, percentages not adding to 100, carbs pushed to zero, very low fat)
+- Targets can follow your weight: logging a new weigh-in recalculates them for the goal
+- Fiber target (automatic or your own) and sodium limit as part of the goal
+- The current goal shows on the diary and in Settings; onboarding now has a goal step
+- Goal settings are included in backups
+
+### Changed
+- Existing targets are kept exactly: after updating, they appear as a custom goal in grams with weight-following off
+- Goals and targets moved into one "Goal and targets" screen
+
 ## [0.1.0] - 2026-10-12
 
 First preview of the calorie and macro tracker.
@@ -32,5 +56,6 @@ First preview of the calorie and macro tracker.
 - Submitting new products and photos back to Open Food Facts
 - Label scanning in the F-Droid build
 
-[Unreleased]: https://github.com/NullWRX/OpenMacro/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/NullWRX/OpenMacro/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/NullWRX/OpenMacro/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/NullWRX/OpenMacro/releases/tag/v0.1.0
