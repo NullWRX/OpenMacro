@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check the tag matches version.properties
         run: |
@@ -24,7 +24,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -47,7 +47,7 @@ jobs:
           OM_KEYSTORE_PASSWORD: ${{ secrets.OM_KEYSTORE_PASSWORD }}
           OM_KEY_ALIAS: ${{ secrets.OM_KEY_ALIAS }}
           OM_KEY_PASSWORD: ${{ secrets.OM_KEY_PASSWORD }}
-        run: ./gradlew --stacktrace :core:test testPlayReleaseUnitTest assemblePlayRelease assembleFdroidRelease
+        run: .github/scripts/gradle.sh :core:test testPlayReleaseUnitTest assemblePlayRelease assembleFdroidRelease
 
       - name: Collect APKs and release notes
         run: |

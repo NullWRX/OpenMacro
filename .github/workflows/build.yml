@@ -18,9 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -28,13 +28,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Unit tests
-        run: ./gradlew --stacktrace :core:test testPlayDebugUnitTest testFdroidDebugUnitTest
+        run: .github/scripts/gradle.sh :core:test testPlayDebugUnitTest testFdroidDebugUnitTest
 
       - name: Build debug APKs (Play and F-Droid flavors)
-        run: ./gradlew --stacktrace assemblePlayDebug assembleFdroidDebug
+        if: success() || failure()
+        run: .github/scripts/gradle.sh assemblePlayDebug assembleFdroidDebug
 
       - name: Lint
-        run: ./gradlew --stacktrace lintPlayDebug
+        run: .github/scripts/gradle.sh lintPlayDebug
 
       - name: Upload debug APKs
         uses: actions/upload-artifact@v4
