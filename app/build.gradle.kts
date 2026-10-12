@@ -55,6 +55,7 @@ android {
         if (hasReleaseSigning) {
             create("release") {
                 storeFile = file(keystorePath!!)
+                if (keystorePath!!.endsWith(".p12")) storeType = "pkcs12"
                 storePassword = System.getenv("OM_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("OM_KEY_ALIAS")
                 keyPassword = System.getenv("OM_KEY_PASSWORD")

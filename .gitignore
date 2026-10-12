@@ -19,3 +19,6 @@ keystore.properties
 
 # Kotlin
 .kotlin/
+
+# Decrypted signing keys
+*.p12

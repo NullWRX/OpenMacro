@@ -54,25 +54,43 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         if: steps.version.outputs.skip != 'true'
 
-      - name: Decode signing key
+      - name: Unlock signing key
         if: steps.version.outputs.skip != 'true'
         env:
-          KEYSTORE_BASE64: ${{ secrets.OM_KEYSTORE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.OM_SIGNING_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "OM_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-          else
-            echo "No signing key configured; release APKs will be signed with a debug key."
+          # The release key lives encrypted in signing/; one secret unlocks it. Every release must
+          # use this same key, or phones refuse to install it as an update, so never fall back.
+          if [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::error title=Signing key locked::Add the OM_SIGNING_PASSWORD repository secret (Settings > Secrets and variables > Actions)."
+            exit 1
           fi
+          PW="$SIGNING_PASSWORD" openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
+            -in signing/openmacro-release.p12.enc -out "$RUNNER_TEMP/release.p12" -pass env:PW
+          {
+            echo "OM_KEYSTORE_PATH=$RUNNER_TEMP/release.p12"
+            echo "OM_KEY_ALIAS=openmacro"
+          } >> "$GITHUB_ENV"
 
       - name: Test and build release APKs
         if: steps.version.outputs.skip != 'true'
         env:
-          OM_KEYSTORE_PASSWORD: ${{ secrets.OM_KEYSTORE_PASSWORD }}
-          OM_KEY_ALIAS: ${{ secrets.OM_KEY_ALIAS }}
-          OM_KEY_PASSWORD: ${{ secrets.OM_KEY_PASSWORD }}
+          OM_KEYSTORE_PASSWORD: ${{ secrets.OM_SIGNING_PASSWORD }}
+          OM_KEY_PASSWORD: ${{ secrets.OM_SIGNING_PASSWORD }}
         run: .github/scripts/gradle.sh :core:test testPlayReleaseUnitTest assemblePlayRelease assembleFdroidRelease
+
+      - name: Check the APKs carry the release certificate
+        if: steps.version.outputs.skip != 'true'
+        run: |
+          expected="0ea58137060a5fa566c33977e315a09692775c852ac8b07af70e5810fe25ace3"
+          for apk in app/build/outputs/apk/*/release/*.apk; do
+            got=$(python3 .github/scripts/apk_cert.py "$apk")
+            echo "$apk -> $got"
+            if [ "$got" != "$expected" ]; then
+              echo "::error title=Wrong signing key::$apk is signed with $got, not the release key."
+              exit 1
+            fi
+          done
 
       - name: Collect APKs and release notes
         if: steps.version.outputs.skip != 'true'

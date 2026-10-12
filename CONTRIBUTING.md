@@ -37,4 +37,4 @@ Versions are `vMAJOR.MINOR.PATCH`, kept in `version.properties` (the only place 
 4. Commit as `Release vX.Y.Z` and push to `main`.
 5. The Release workflow sees the version change, builds and tests both flavors, creates the `vX.Y.Z` tag and publishes a GitHub release with the changelog section as notes. Pushing a `vX.Y.Z` tag yourself works too; a version that's already released is skipped.
 
-To sign release APKs, add repository secrets `OM_KEYSTORE_BASE64` (the keystore, base64), `OM_KEYSTORE_PASSWORD`, `OM_KEY_ALIAS` and `OM_KEY_PASSWORD`. Without them, release APKs are signed with a throwaway debug key: they install, but a later build signed with the real key can't update them in place (uninstall first).
+Release APKs are signed with the project key in `signing/` (see `signing/README.md`), unlocked by the `OM_SIGNING_PASSWORD` repository secret. The workflow refuses to publish without it and checks every APK's certificate, because a release signed with any other key can't be installed as an update.
