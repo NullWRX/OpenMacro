@@ -34,7 +34,7 @@ Versions are `vMAJOR.MINOR.PATCH`, kept in `version.properties` (the only place 
 1. Bump `version.properties`.
 2. Move the `[Unreleased]` notes in `CHANGELOG.md` under a new `## [x.y.z] - YYYY-MM-DD` heading.
 3. Add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (under 500 characters) for F-Droid.
-4. Commit as `Release vX.Y.Z`, then tag and push: `git tag vX.Y.Z && git push origin main vX.Y.Z`.
-5. The Release workflow checks the tag against `version.properties`, builds both flavors and publishes a GitHub release with the changelog section as notes.
+4. Commit as `Release vX.Y.Z` and push to `main`.
+5. The Release workflow sees the version change, builds and tests both flavors, creates the `vX.Y.Z` tag and publishes a GitHub release with the changelog section as notes. Pushing a `vX.Y.Z` tag yourself works too; a version that's already released is skipped.
 
-To sign release APKs, add repository secrets `OM_KEYSTORE_BASE64` (the keystore, base64), `OM_KEYSTORE_PASSWORD`, `OM_KEY_ALIAS` and `OM_KEY_PASSWORD`. Without them the APKs are unsigned.
+To sign release APKs, add repository secrets `OM_KEYSTORE_BASE64` (the keystore, base64), `OM_KEYSTORE_PASSWORD`, `OM_KEY_ALIAS` and `OM_KEY_PASSWORD`. Without them, release APKs are signed with a throwaway debug key: they install, but a later build signed with the real key can't update them in place (uninstall first).
