@@ -1,0 +1,46 @@
+name: Refresh USDA food data
+
+# Run by hand (Actions tab > Refresh USDA food data > Run workflow). Downloads USDA FoodData
+# Central SR Legacy (public domain), rebuilds the bundled asset and opens a pull request.
+# Needs "Allow GitHub Actions to create and approve pull requests" in Settings > Actions.
+on:
+  workflow_dispatch:
+    inputs:
+      extra_zip_url:
+        description: "Optional extra FoodData Central CSV zip URL (for example a Foundation Foods release)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download FoodData Central
+        env:
+          EXTRA_URL: ${{ inputs.extra_zip_url }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/fdc"
+          curl -fsSL -o "$RUNNER_TEMP/fdc/sr_legacy.zip" \
+            https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip
+          if [ -n "$EXTRA_URL" ]; then
+            curl -fsSL -o "$RUNNER_TEMP/fdc/extra.zip" "$EXTRA_URL"
+          fi
+
+      - name: Build asset
+        run: python3 tools/usda/build_usda_asset.py --out app/src/main/assets/foods "$RUNNER_TEMP"/fdc/*.zip
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: data/usda-refresh
+          commit-message: "Data: refresh bundled USDA FoodData Central foods"
+          title: "Data: refresh bundled USDA foods"
+          body: |
+            Rebuilt `app/src/main/assets/foods/` from USDA FoodData Central (public domain, CC0) with
+            `tools/usda/build_usda_asset.py`. Phones load the new foods on the next app start.

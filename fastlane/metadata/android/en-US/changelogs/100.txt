@@ -1,0 +1,1 @@
+First preview: food diary, barcode and label scanning, search, custom foods, quick add, copy and move, targets from your profile, weight trend, backup and CSV export.

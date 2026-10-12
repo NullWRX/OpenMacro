@@ -1,0 +1,54 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew --stacktrace :core:test testPlayDebugUnitTest testFdroidDebugUnitTest
+
+      - name: Build debug APKs (Play and F-Droid flavors)
+        run: ./gradlew --stacktrace assemblePlayDebug assembleFdroidDebug
+
+      - name: Lint
+        run: ./gradlew --stacktrace lintPlayDebug
+
+      - name: Upload debug APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: openmacro-debug-apks
+          path: app/build/outputs/apk/**/*.apk
+          retention-days: 14
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            core/build/reports/
+            app/build/reports/
+          retention-days: 14

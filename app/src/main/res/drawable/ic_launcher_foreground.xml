@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A plate seen from above, split into three macro segments. 108dp canvas, 72dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Plate rim -->
+    <path
+        android:fillColor="#FFF4FAF6"
+        android:pathData="M54,24a30,30 0,1 1,0 60a30,30 0,1 1,0 -60z" />
+    <!-- Protein segment (top right) -->
+    <path
+        android:fillColor="#FF6FB7FF"
+        android:pathData="M54,32A22,22 0,0 1,73.05 65L54,54Z" />
+    <!-- Carbs segment (bottom) -->
+    <path
+        android:fillColor="#FFF2B84B"
+        android:pathData="M73.05,65A22,22 0,0 1,34.95 65L54,54Z" />
+    <!-- Fat segment (top left) -->
+    <path
+        android:fillColor="#FFF08AA0"
+        android:pathData="M34.95,65A22,22 0,0 1,54 32L54,54Z" />
+    <!-- Centre -->
+    <path
+        android:fillColor="#FFF4FAF6"
+        android:pathData="M54,46a8,8 0,1 1,0 16a8,8 0,1 1,0 -16z" />
+</vector>

@@ -1,0 +1,31 @@
+OpenMacro is a free, open-source calorie and macro tracker. Every feature is free: no subscription, no ads, no account.
+
+<b>Log food fast</b>
+<ul>
+<li>Scan a barcode to look the product up in Open Food Facts</li>
+<li>Scan a nutrition label to add a food in seconds (Google Play build)</li>
+<li>Search your foods, generic USDA foods and Open Food Facts</li>
+<li>One tap re-logs your usual amount from recent foods and favorites</li>
+<li>Quick add calories and macros when you just know the numbers</li>
+<li>Copy a meal or a whole day; move or copy single items</li>
+</ul>
+
+<b>Targets that fit you</b>
+<ul>
+<li>Starting targets from your profile and goal (Mifflin-St Jeor)</li>
+<li>Set calories, protein, carbs, fat, fiber and sodium yourself</li>
+<li>Custom meals, metric or imperial, kcal or kJ</li>
+</ul>
+
+<b>Progress</b>
+<ul>
+<li>Weight log with a smoothed trend line and weekly rate</li>
+</ul>
+
+<b>Your data is yours</b>
+<ul>
+<li>Everything stays on your phone</li>
+<li>Full JSON backup and restore; CSV export of your diary and weights</li>
+</ul>
+
+Packaged food data: Open Food Facts contributors (ODbL). Generic foods: USDA FoodData Central (public domain).
