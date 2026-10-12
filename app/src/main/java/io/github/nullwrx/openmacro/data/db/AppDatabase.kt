@@ -9,16 +9,26 @@ import androidx.room.TypeConverters
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
-class Converters {
+/**
+ * JSON for serving lists. Kept outside [Converters] because Room's annotation processor inspects
+ * that class and cannot see serializers the serialization plugin generates.
+ */
+internal object ServingJson {
     private val json = Json { ignoreUnknownKeys = true }
-    private val servingList = ListSerializer(ServingColumn.serializer())
+
+    fun encode(value: List<ServingColumn>): String =
+        json.encodeToString(ListSerializer(ServingColumn.serializer()), value)
+
+    fun decode(value: String): List<ServingColumn> =
+        if (value.isBlank()) emptyList() else json.decodeFromString(ListSerializer(ServingColumn.serializer()), value)
+}
+
+class Converters {
+    @TypeConverter
+    fun servingsToJson(value: List<ServingColumn>): String = ServingJson.encode(value)
 
     @TypeConverter
-    fun servingsToJson(value: List<ServingColumn>): String = json.encodeToString(servingList, value)
-
-    @TypeConverter
-    fun servingsFromJson(value: String): List<ServingColumn> =
-        if (value.isBlank()) emptyList() else json.decodeFromString(servingList, value)
+    fun servingsFromJson(value: String): List<ServingColumn> = ServingJson.decode(value)
 }
 
 @Database(
