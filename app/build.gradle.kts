@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 val versionProps = Properties().apply {
@@ -128,8 +129,13 @@ kotlin {
     }
 }
 
+// The Room plugin keeps one schema file per database version and copies it safely for every
+// build variant (the play and fdroid builds would otherwise overwrite each other's file).
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
 ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
     arg("room.generateKotlin", "true")
 }
 
