@@ -2,7 +2,7 @@
 
 A free, open-source calorie and macro tracker for Android. The features other trackers charge for, such as barcode scanning, label scanning and custom macro targets, are free here, with no ads, no account and no subscription.
 
-> **Status: v0.2.0, early preview.** The calorie and macro tracker is the focus. Workout tracking is planned for later.
+> **Status: v0.2.1, early preview.** The calorie and macro tracker is the focus. Workout tracking is planned for later.
 
 ## Features
 

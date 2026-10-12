@@ -1,0 +1,1 @@
+Releases are now signed with one permanent key, so future updates install over this version. Coming from v0.1.0 or v0.2.0: back up, uninstall, install, restore (needed once).

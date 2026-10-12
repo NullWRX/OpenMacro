@@ -4,6 +4,14 @@ All notable changes to OpenMacro. Versions follow `vMAJOR.MINOR.PATCH` (see CONT
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-12
+
+### Fixed
+- Releases are now signed with one permanent key. v0.1.0 and v0.2.0 were each signed with a different temporary key, so v0.2.0 would not install over v0.1.0. From v0.2.1 on, every update installs over the previous version.
+
+### Upgrading from v0.1.0 or v0.2.0
+Back up in Settings > Your data > Back up everything, uninstall the old app, install v0.2.1, then restore the backup. This is needed once.
+
 ## [0.2.0] - 2026-10-12
 
 Fitness goals: pick what you're training for and the app sets your calories and macros.
@@ -56,6 +64,7 @@ First preview of the calorie and macro tracker.
 - Submitting new products and photos back to Open Food Facts
 - Label scanning in the F-Droid build
 
-[Unreleased]: https://github.com/NullWRX/OpenMacro/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/NullWRX/OpenMacro/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/NullWRX/OpenMacro/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/NullWRX/OpenMacro/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/NullWRX/OpenMacro/releases/tag/v0.1.0
